@@ -111,6 +111,26 @@ services:
       - --ServerApp.root_dir=/workspace
       - --IdentityProvider.token=${JUPYTER_TOKEN:-formation}
 
+  portal:
+    build:
+      context: ./dashboard
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-formation}
+      POSTGRES_USER: ${POSTGRES_USER:-formation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-formation}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      KAFKA_PORT: ${KAFKA_PORT:-9092}
+      JUPYTER_PORT: ${JUPYTER_PORT:-8888}
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-formation}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-labadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-TRAINING_ONLY_S3_PASSWORD}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_API_PORT: ${S3_API_PORT:-9000}
+      S3_CONSOLE_PORT: ${S3_CONSOLE_PORT:-9001}
+    ports:
+      - "127.0.0.1:${PORTAL_PORT:-25021}:8090"
+
 volumes:
   postgres-data:
   kafka-data:
