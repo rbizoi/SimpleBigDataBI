@@ -1,6 +1,7 @@
 from html import escape
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
+from urllib.parse import quote
 
 
 def value(name: str, default: str) -> str:
@@ -36,7 +37,7 @@ def page() -> bytes:
 
     cards = "".join([
         card("PostgreSQL", "Base et compte de connexion", [("Hôte", "localhost:" + pg_port, ""), ("Base", db, ""), ("Utilisateur", user, ""), ("Mot de passe", password, "")], []),
-        card("JupyterLab · Spark", "Espace de notebooks", [("Jeton actif", jupyter_token, "")], [("Ouvrir JupyterLab", "http://localhost:" + jupyter_port + "/lab?token=" + jupyter_token)]),
+        card("JupyterLab · Spark", "Espace de notebooks", [("Jeton actif", jupyter_token, "")], [("Ouvrir JupyterLab", "http://localhost:" + jupyter_port + "/lab?token=" + quote(jupyter_token, safe=""))]),
         card("RustFS", "Stockage objet compatible S3", [("Clé d’accès", s3_key, ""), ("Secret", s3_secret, ""), ("Région", value("AWS_REGION", "us-east-1"), "")], [("API S3", "http://localhost:" + s3_api_port), ("Console", "http://localhost:" + s3_console_port)]),
         card("Kafka", "Broker de messages · sans authentification", [("Adresse hôte", "localhost:" + kafka_port, ""), ("Adresse conteneur", "kafka:19092", "")], []),
     ])
@@ -55,7 +56,7 @@ main{max-width:1120px;margin:28px auto 64px;padding:0 24px}.notice{display:flex;
 @media(max-width:700px){.grid{grid-template-columns:1fr}.top{padding:25px 22px 30px}main{padding:0 16px;margin-top:18px}.field{grid-template-columns:85px minmax(0,1fr) auto}}
 </style></head><body><header class="top"><div class="topline"><span class="mark">SB</span> Formation Big Data &amp; BI</div><h1>Votre environnement local</h1><p>Accès aux services et identifiants configurés pour cette machine. Les valeurs sont celles transmises par la configuration Docker Compose.</p></header>
 <main><section class="notice"><span aria-hidden="true">🔒</span><div><strong>Portail accessible uniquement depuis cet ordinateur</strong><p>Les ports des services et du portail sont liés à localhost. Gardez cette page privée : elle affiche les secrets actifs de votre environnement.</p></div></section>
-<section class="grid">''' + cards + '''</section><p class="foot">Les identifiants affichés correspondent aux variables de .env.example. Pour les modifier, mettez à jour ce fichier puis recréez les services.</p></main>
+<section class="grid">''' + cards + '''</section><p class="foot">Les identifiants proviennent du fichier d’environnement chargé par Compose (par défaut, .env.example).</p></main>
 <script>document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(b.dataset.copy);b.textContent='Copié';setTimeout(()=>b.textContent='Copier',1200)}catch{b.textContent='Copie indisponible';setTimeout(()=>b.textContent='Copier',1600)}}));</script>
 </body></html>'''
     return html.encode("utf-8")
