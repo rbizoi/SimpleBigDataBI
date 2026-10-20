@@ -17,7 +17,7 @@ Le projet n’utilise pas de répertoire local de jeux de données. Les données
 
 ## Prérequis
 
-Docker Desktop avec Docker Compose v2, ou Docker Engine avec le plugin Compose. Prévoir environ 8 Go de mémoire pour l’ensemble du cluster Spark et des services associés.
+Docker Desktop avec Docker Compose v2, ou Docker Engine avec le plugin Compose. Prévoir au moins 12 Go de mémoire disponibles pour Docker pour l’ensemble du cluster et des services associés.
 
 ## Démarrer
 
