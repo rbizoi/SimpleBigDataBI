@@ -304,6 +304,8 @@ services:
         condition: service_healthy
       spark-worker-2:
         condition: service_healthy
+      rustfs:
+        condition: service_healthy
 
   portal:
     build:
