@@ -37,7 +37,11 @@ RUN set -eux; \
       /home/spark/.local/share/jupyter/runtime /opt/spark/notebooks \
       /opt/spark/events /opt/spark/warehouse /tmp/spark-ivy; \
     chown -R spark:spark /home/spark /opt/spark/notebooks \
-      /opt/spark/events /opt/spark/warehouse /tmp/spark-ivy
+      /opt/spark/events /opt/spark/warehouse /tmp/spark-ivy; \
+    py4j_zip="$(find /opt/spark/python/lib -maxdepth 1 -type f -name 'py4j-*-src.zip' -print -quit)"; \
+    test -n "$py4j_zip"; \
+    ln -sf "$py4j_zip" /opt/spark/python/lib/py4j-src.zip; \
+    chown -h spark:spark /opt/spark/python/lib/py4j-src.zip
 
 ENV HOME=/home/spark \
     XDG_CONFIG_HOME=/home/spark/.config \
