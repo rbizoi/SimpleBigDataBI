@@ -7,9 +7,10 @@ Environnement pédagogique Big Data et BI réduit, lancé avec Docker Compose.
 - **PostgreSQL** pour les exercices SQL et la préparation de tables analytiques.
 - **Kafka** en mode KRaft pour découvrir les flux d’événements.
 - **Spark et JupyterLab** pour les traitements batch et l’exploration avec PySpark.
+- **RustFS** pour les exercices de stockage objet compatibles S3.
 - **Power BI** peut se connecter à PostgreSQL depuis la machine hôte.
 
-Le projet ne requiert aucun dossier local de jeux de données. Les exercices peuvent partir de données créées dans PostgreSQL ou de fichiers que vous placez vous-même dans `notebooks/`. Aucun chargement automatique vers un stockage objet n’est configuré.
+Les documents Spark du dépôt source sont repris dans `notebooks/`. Le projet ne requiert pas de répertoire local de jeux de données et ne copie ni ne charge automatiquement de fichiers vers RustFS. Les exemples peuvent s’appuyer sur des données créées dans PostgreSQL ou sur des fichiers que vous ajoutez vous-même.
 
 ## Prérequis
 
@@ -36,10 +37,12 @@ Pour personnaliser les identifiants ou les ports, copier `.env.example` vers `.e
 | PostgreSQL depuis l’hôte | localhost:5432 |
 | Kafka depuis l’hôte | localhost:9092 |
 | Kafka depuis les conteneurs | kafka:19092 |
+| API S3 RustFS | http://localhost:9000 |
+| Console RustFS | http://localhost:9001 |
 
-Paramètres PostgreSQL par défaut : base `formation`, utilisateur `formation`, mot de passe `formation`. Ils sont destinés à un usage local de formation.
+Accès RustFS par défaut : clé `labadmin`, secret `TRAINING_ONLY_S3_PASSWORD`. Ces identifiants sont prévus pour un usage local de formation. Aucun bucket ni chargement de fichiers n’est configuré automatiquement.
 
-Pour Power BI Desktop, choisir le connecteur PostgreSQL et utiliser `localhost:5432`.
+Paramètres PostgreSQL par défaut : base `formation`, utilisateur `formation`, mot de passe `formation`. Pour Power BI Desktop, choisir le connecteur PostgreSQL et utiliser `localhost:5432`.
 
 ## Exemple Spark
 
@@ -55,7 +58,7 @@ Les notebooks locaux sont montés dans `notebooks/`. Pour arrêter les services 
 docker compose down
 ```
 
-Pour supprimer aussi les tables PostgreSQL enregistrées dans le volume Compose :
+Pour supprimer aussi les volumes PostgreSQL, Kafka et RustFS :
 
 ```bash
 docker compose down -v
