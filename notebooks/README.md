@@ -4,6 +4,6 @@ Ce dossier reprend le contenu de `spark/notebooks` du dépôt FormationBigDataBI
 
 JupyterLab rend ce dossier disponible sous `/workspace/notebooks`. Spark tourne en mode local dans le conteneur `spark-lab`. Pour lancer les services, consultez le [guide général](../README.md).
 
-RustFS est également démarré pour les exercices S3. Il est accessible depuis les conteneurs avec l’URL `http://rustfs:9000` et depuis l’hôte avec `http://localhost:9000`. Les documents sont copiés tels quels; les buckets ne sont pas créés et aucun fichier n’est chargé automatiquement.
+RustFS est également démarré pour les exercices S3. Il est accessible depuis les conteneurs avec l’URL `http://rustfs:9000` et depuis l’hôte avec `http://localhost:9000`. Les buckets ne sont pas créés et aucun fichier n’est chargé automatiquement.
 
 Certains supports d’origine peuvent supposer des fichiers ou des services absents de cette version simplifiée. Les exercices concernés devront être adaptés à votre environnement avant leur exécution.
