@@ -9,42 +9,60 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-formation}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-formation}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-25001}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-formation} -d ${POSTGRES_DB:-formation}"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 24
+      start_period: 5s
 
   kafka:
     image: apache/kafka:4.3.1
     restart: unless-stopped
+    mem_limit: 1g
     environment:
+      KAFKA_HEAP_OPTS: -Xms384m -Xmx512m
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: INTERNAL://:19092,CONTROLLER://:9093,EXTERNAL://:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENERS: PLAINTEXT://:19092,CONTROLLER://:9093,PLAINTEXT_HOST://:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,PLAINTEXT_HOST://localhost:${KAFKA_EXTERNAL_PORT:-25002}
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       CLUSTER_ID: ${KAFKA_CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     ports:
-      - "127.0.0.1:${KAFKA_PORT:-9092}:9092"
+      - "127.0.0.1:${KAFKA_EXTERNAL_PORT:-25002}:9092"
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list >/dev/null 2>&1"]
-      interval: 10s
+      interval: 5s
       timeout: 10s
-      retries: 20
+      retries: 30
       start_period: 15s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: SimpleBigDataBI
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
+    ports:
+      - "127.0.0.1:${KAFKA_UI_PORT:-25018}:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   rustfs-permissions:
     image: alpine:3.22.5
@@ -57,6 +75,7 @@ services:
   rustfs:
     image: rustfs/rustfs:1.0.0-rc.6
     restart: unless-stopped
+    mem_limit: 1g
     depends_on:
       rustfs-permissions:
         condition: service_completed_successfully
@@ -71,8 +90,8 @@ services:
       RUSTFS_UNSAFE_BYPASS_DISK_CHECK: "true"
       RUSTFS_OBS_LOGGER_LEVEL: warn
     ports:
-      - "127.0.0.1:${S3_API_PORT:-9000}:9000"
-      - "127.0.0.1:${S3_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${S3_API_PORT:-25003}:9000"
+      - "127.0.0.1:${S3_CONSOLE_PORT:-25004}:9001"
     volumes:
       - rustfs-data:/data
     healthcheck:
@@ -82,24 +101,181 @@ services:
       retries: 30
       start_period: 20s
 
-  spark-lab:
-    build:
-      context: ./docker/spark
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    environment:
-      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-formation}
-      PYSPARK_PYTHON: python3
-      SPARK_LOCAL_IP: spark-lab
-    ports:
-      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+  spark-permissions:
+    image: alpine:3.22.5
+    restart: "no"
+    user: "0:0"
+    command: ["sh", "-ec", "mkdir -p /events && chmod -R 0777 /events"]
     volumes:
-      - ./notebooks:/workspace/notebooks
-      - ./jobs:/workspace/jobs
+      - spark-events:/events
+
+  spark-master:
+    build:
+      context: .
+      dockerfile: spark/runtime/Dockerfile
+    restart: unless-stopped
+    hostname: spark-master
+    mem_limit: 2g
+    environment: &spark-environment
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-labadmin}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-TRAINING_ONLY_S3_PASSWORD}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      SPARK_NO_DAEMONIZE: "true"
+      PYSPARK_PYTHON: python3
+      SPARK_LOG_DIR: /tmp/spark-logs
+      SPARK_PID_DIR: /tmp/spark-pids
+      SPARK_DAEMON_MEMORY: 512m
+    volumes: &spark-volumes
+      - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ./spark/conf/log4j2.properties:/opt/spark/conf/log4j2.properties:ro
+      - spark-events:/opt/spark/events
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+      - --host
+      - spark-master
+      - --port
+      - "7077"
+      - --webui-port
+      - "8080"
+    ports:
+      - "127.0.0.1:${SPARK_MASTER_UI_PORT:-25006}:8080"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('spark-master',7077),3); s.close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      spark-permissions:
+        condition: service_completed_successfully
+
+  spark-worker-1:
+    build:
+      context: .
+      dockerfile: spark/runtime/Dockerfile
+    restart: unless-stopped
+    hostname: spark-worker-1
+    mem_limit: 1536m
+    environment: *spark-environment
+    volumes: *spark-volumes
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - spark://spark-master:7077
+      - --cores
+      - "2"
+      - --memory
+      - 1g
+      - --webui-port
+      - "8081"
+    ports:
+      - "127.0.0.1:${SPARK_WORKER1_UI_PORT:-25007}:8081"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('spark-worker-1',8081),3); s.close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      spark-permissions:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_healthy
+
+  spark-worker-2:
+    build:
+      context: .
+      dockerfile: spark/runtime/Dockerfile
+    restart: unless-stopped
+    hostname: spark-worker-2
+    mem_limit: 1536m
+    environment: *spark-environment
+    volumes: *spark-volumes
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - spark://spark-master:7077
+      - --cores
+      - "2"
+      - --memory
+      - 1g
+      - --webui-port
+      - "8081"
+    ports:
+      - "127.0.0.1:${SPARK_WORKER2_UI_PORT:-25008}:8081"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('spark-worker-2',8081),3); s.close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      spark-permissions:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_healthy
+
+  spark-history:
+    build:
+      context: .
+      dockerfile: spark/runtime/Dockerfile
+    restart: unless-stopped
+    hostname: spark-history
+    mem_limit: 1g
+    environment: *spark-environment
+    volumes: *spark-volumes
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.history.HistoryServer
+    ports:
+      - "127.0.0.1:${SPARK_HISTORY_UI_PORT:-25009}:18080"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('spark-history',18080),3); s.close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 15s
+    depends_on:
+      spark-permissions:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_healthy
+
+  spark-jupyter:
+    build:
+      context: .
+      dockerfile: spark/runtime/Dockerfile
+    restart: unless-stopped
+    hostname: spark-jupyter
+    user: spark
+    mem_limit: 2g
+    environment:
+      <<: *spark-environment
+      HOME: /home/spark
+      XDG_CONFIG_HOME: /home/spark/.config
+      XDG_CACHE_HOME: /home/spark/.cache
+      XDG_DATA_HOME: /home/spark/.local/share
+      JUPYTER_CONFIG_DIR: /home/spark/.jupyter
+      JUPYTER_DATA_DIR: /home/spark/.local/share/jupyter
+      JUPYTER_RUNTIME_DIR: /home/spark/.local/share/jupyter/runtime
+      SPARK_LOCAL_IP: spark-jupyter
+      SPARK_MASTER_URL: spark://spark-master:7077
+      PYSPARK_DRIVER_PYTHON: python3
+      PYSPARK_SUBMIT_ARGS: >-
+        --master spark://spark-master:7077
+        --conf spark.driver.host=spark-jupyter
+        --conf spark.driver.bindAddress=0.0.0.0
+        --conf spark.ui.enabled=true
+        --conf spark.ui.port=4040
+        pyspark-shell
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-formation}
+    volumes:
+      - ./spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ./spark/conf/log4j2.properties:/opt/spark/conf/log4j2.properties:ro
+      - ./notebooks:/opt/spark/notebooks
+      - spark-events:/opt/spark/events
     command:
       - python3
       - -m
@@ -108,8 +284,26 @@ services:
       - --ip=0.0.0.0
       - --port=8888
       - --no-browser
-      - --ServerApp.root_dir=/workspace
+      - --ServerApp.root_dir=/opt/spark/notebooks
       - --IdentityProvider.token=${JUPYTER_TOKEN:-formation}
+    ports:
+      - "127.0.0.1:${JUPYTER_PORT:-25010}:8888"
+      - "127.0.0.1:${SPARK_JOBS_UI_PORT:-25011}:4040"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8888),3); s.close()"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+    depends_on:
+      spark-permissions:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_healthy
+      spark-worker-1:
+        condition: service_healthy
+      spark-worker-2:
+        condition: service_healthy
 
   portal:
     build:
@@ -119,19 +313,26 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-formation}
       POSTGRES_USER: ${POSTGRES_USER:-formation}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-formation}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      KAFKA_PORT: ${KAFKA_PORT:-9092}
-      JUPYTER_PORT: ${JUPYTER_PORT:-8888}
+      POSTGRES_PORT: ${POSTGRES_PORT:-25001}
+      KAFKA_PORT: ${KAFKA_EXTERNAL_PORT:-25002}
+      KAFKA_UI_PORT: ${KAFKA_UI_PORT:-25018}
+      JUPYTER_PORT: ${JUPYTER_PORT:-25010}
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-formation}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-labadmin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-TRAINING_ONLY_S3_PASSWORD}
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      S3_API_PORT: ${S3_API_PORT:-9000}
-      S3_CONSOLE_PORT: ${S3_CONSOLE_PORT:-9001}
+      S3_API_PORT: ${S3_API_PORT:-25003}
+      S3_CONSOLE_PORT: ${S3_CONSOLE_PORT:-25004}
+      SPARK_MASTER_UI_PORT: ${SPARK_MASTER_UI_PORT:-25006}
+      SPARK_WORKER1_UI_PORT: ${SPARK_WORKER1_UI_PORT:-25007}
+      SPARK_WORKER2_UI_PORT: ${SPARK_WORKER2_UI_PORT:-25008}
+      SPARK_HISTORY_UI_PORT: ${SPARK_HISTORY_UI_PORT:-25009}
+      SPARK_JOBS_UI_PORT: ${SPARK_JOBS_UI_PORT:-25011}
     ports:
-      - "127.0.0.1:${PORTAL_PORT:-25021}:8090"
+      - "127.0.0.1:${DASHBOARD_PORT:-25021}:8090"
 
 volumes:
   postgres-data:
   kafka-data:
   rustfs-data:
+  spark-events:
