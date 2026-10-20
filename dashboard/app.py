@@ -23,12 +23,18 @@ def card(title: str, subtitle: str, fields: list[tuple[str, str, str]], links: l
 
 
 def page() -> bytes:
-    pg_port = value("POSTGRES_PORT", "5432")
-    kafka_port = value("KAFKA_PORT", "9092")
-    jupyter_port = value("JUPYTER_PORT", "8888")
+    pg_port = value("POSTGRES_PORT", "25001")
+    kafka_port = value("KAFKA_PORT", "25002")
+    jupyter_port = value("JUPYTER_PORT", "25010")
+    kafka_ui_port = value("KAFKA_UI_PORT", "25018")
+    spark_master_port = value("SPARK_MASTER_UI_PORT", "25006")
+    spark_worker1_port = value("SPARK_WORKER1_UI_PORT", "25007")
+    spark_worker2_port = value("SPARK_WORKER2_UI_PORT", "25008")
+    spark_history_port = value("SPARK_HISTORY_UI_PORT", "25009")
+    spark_jobs_port = value("SPARK_JOBS_UI_PORT", "25011")
     jupyter_token = value("JUPYTER_TOKEN", "formation")
-    s3_api_port = value("S3_API_PORT", "9000")
-    s3_console_port = value("S3_CONSOLE_PORT", "9001")
+    s3_api_port = value("S3_API_PORT", "25003")
+    s3_console_port = value("S3_CONSOLE_PORT", "25004")
     s3_key = value("S3_ACCESS_KEY", "labadmin")
     s3_secret = value("S3_SECRET_KEY", "TRAINING_ONLY_S3_PASSWORD")
     db = value("POSTGRES_DB", "formation")
@@ -39,7 +45,8 @@ def page() -> bytes:
         card("PostgreSQL", "Base et compte de connexion", [("Hôte", "localhost:" + pg_port, ""), ("Base", db, ""), ("Utilisateur", user, ""), ("Mot de passe", password, "")], []),
         card("JupyterLab · Spark", "Espace de notebooks", [("Jeton actif", jupyter_token, "")], [("Ouvrir JupyterLab", "http://localhost:" + jupyter_port + "/lab?token=" + quote(jupyter_token, safe=""))]),
         card("RustFS", "Stockage objet compatible S3", [("Clé d’accès", s3_key, ""), ("Secret", s3_secret, ""), ("Région", value("AWS_REGION", "us-east-1"), "")], [("API S3", "http://localhost:" + s3_api_port), ("Console", "http://localhost:" + s3_console_port)]),
-        card("Kafka", "Broker de messages · sans authentification", [("Adresse hôte", "localhost:" + kafka_port, ""), ("Adresse conteneur", "kafka:19092", "")], []),
+        card("Kafka", "Broker de messages · sans authentification", [("Adresse hôte", "localhost:" + kafka_port, ""), ("Adresse conteneur", "kafka:19092", "")], [("Ouvrir Kafka UI", "http://localhost:" + kafka_ui_port)]),
+        card("Cluster Spark", "Maître, deux ouvriers et historique des traitements", [], [("Maître", "http://localhost:" + spark_master_port), ("Ouvrier 1", "http://localhost:" + spark_worker1_port), ("Ouvrier 2", "http://localhost:" + spark_worker2_port), ("Historique", "http://localhost:" + spark_history_port), ("Jobs Jupyter", "http://localhost:" + spark_jobs_port)]),
     ])
     html = '''<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
