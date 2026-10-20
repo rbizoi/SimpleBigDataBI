@@ -1,0 +1,12 @@
+numpy
+pandas
+scikit-image
+scikit-learn
+yellowbrick
+lightgbm
+xgboost
+catboost
+optuna
+kneed
+imbalanced-learn
+openpyxl==3.1.5
