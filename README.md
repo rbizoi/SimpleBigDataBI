@@ -24,7 +24,9 @@ docker compose up -d
 docker compose ps
 ```
 
-Ouvrir JupyterLab sur [http://localhost:8888](http://localhost:8888). Le jeton par défaut est `formation`; pour le modifier, définir la variable `JUPYTER_TOKEN` avant le démarrage.
+Ouvrir JupyterLab sur [http://localhost:8888](http://localhost:8888). Le jeton par défaut est `formation`.
+
+Pour personnaliser les identifiants ou les ports, copier `.env.example` vers `.env`, puis modifier les valeurs avant le démarrage.
 
 ## Connexions
 
@@ -33,11 +35,11 @@ Ouvrir JupyterLab sur [http://localhost:8888](http://localhost:8888). Le jeton p
 | JupyterLab | http://localhost:8888 |
 | PostgreSQL depuis l’hôte | localhost:5432 |
 | Kafka depuis l’hôte | localhost:9092 |
-| Kafka depuis les conteneurs | kafka:9092 |
+| Kafka depuis les conteneurs | kafka:19092 |
 
 Paramètres PostgreSQL par défaut : base `formation`, utilisateur `formation`, mot de passe `formation`. Ils sont destinés à un usage local de formation.
 
-Pour Power BI Desktop, choisir le connecteur PostgreSQL et utiliser `localhost:5432`. Les identifiants peuvent être changés dans le fichier Compose avant le premier démarrage.
+Pour Power BI Desktop, choisir le connecteur PostgreSQL et utiliser `localhost:5432`.
 
 ## Exemple Spark
 
